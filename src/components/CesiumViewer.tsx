@@ -26,5 +26,5 @@ export function CesiumViewer() {
     };
   }, []);
 
-  return <div ref={containerRef} style={{ height: '100%', width: '100%' }} />;
+  return <div ref={containerRef} style={{ height: '100%', width: '100%', position: 'relative' }} />;
 }
