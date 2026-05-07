@@ -171,7 +171,6 @@ Each option creates a new component under `src/components/` and mounts it in
   `viewer.camera.flyTo` with user-entered coords.
 - **Fly-to buttons**: create `src/components/FlyToButtons.tsx`:
   ```tsx
-  import { useEffect, useState } from 'react';
   import * as Cesium from 'cesium';
 
   type Props = { viewer: Cesium.Viewer | null };
