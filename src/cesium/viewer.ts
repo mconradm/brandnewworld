@@ -19,6 +19,14 @@ export async function createViewer(container: HTMLDivElement): Promise<Cesium.Vi
     selectionIndicator: false,
   });
 
+  // On-demand rendering — idle = 0 frames. Camera moves and tile loads
+  // trigger renders automatically; any custom RAF code that mutates the
+  // scene must call viewer.scene.requestRender(). See src/cesium/animate.ts
+  // for the helper that handles this for animations.
+  viewer.clock.shouldAnimate = false;
+  viewer.scene.requestRenderMode = true;
+  viewer.scene.maximumRenderTimeChange = Infinity;
+
   // Photoreal-friendly rendering. Without these the Google tiles look
   // oversaturated and washed out.
   viewer.scene.highDynamicRange = true;

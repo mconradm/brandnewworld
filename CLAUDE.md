@@ -231,6 +231,81 @@ guess at vanilla HTML or Next.js setup if the user is on a tight budget.
 3. Tell the user which files changed and how to start the dev server
    (`npm run dev`).
 
+## Performance patterns (read this before adding polygons or animations)
+
+The starter ships with **on-demand rendering** turned on in
+`src/cesium/viewer.ts`:
+
+```ts
+viewer.clock.shouldAnimate = false;
+viewer.scene.requestRenderMode = true;
+viewer.scene.maximumRenderTimeChange = Infinity;
+```
+
+Idle = 0 frames. Camera moves and tile loads trigger renders automatically.
+Two implications when adding overlays or custom code:
+
+### Static polygons: plain values or ConstantProperty, never CallbackProperty
+
+`CallbackProperty` is invoked every frame and Cesium assumes the value can
+change, so the polygon is **re-tesselated every frame**. For polygons that
+don't animate, pass plain values directly:
+
+```ts
+viewer.entities.add({
+  polygon: {
+    hierarchy: Cesium.Cartesian3.fromDegreesArray(coords),
+    height: 0,
+    extrudedHeight: 50,                            // plain number
+    material: Cesium.Color.RED.withAlpha(0.5),     // plain Color
+  },
+});
+```
+
+Or wrap explicitly: `new Cesium.ConstantProperty(50)`. Same effect — Cesium
+caches the tesselation.
+
+### Animated polygons: use the `animate` helper, then settle to constants
+
+If a polygon actually animates (grow-in, color pulse, etc.), use the helper at
+[`src/cesium/animate.ts`](src/cesium/animate.ts) and **swap back to a
+ConstantProperty when the animation finishes** so the polygon stops
+re-tesselating:
+
+```ts
+import { animate } from '../cesium/animate';
+
+const targetHeight = 80;
+let current = 0;
+const polygon = viewer.entities.add({
+  polygon: {
+    hierarchy: Cesium.Cartesian3.fromDegreesArray(coords),
+    height: 0,
+    extrudedHeight: new Cesium.CallbackProperty(() => current, false),
+    material: Cesium.Color.RED.withAlpha(0.5),
+  },
+}).polygon!;
+
+animate(
+  viewer,
+  1000,
+  (t) => { current = targetHeight * (1 - Math.pow(1 - t, 3)); },
+  () => { polygon.extrudedHeight = new Cesium.ConstantProperty(targetHeight); },
+);
+```
+
+### The two rules
+
+- **Mutate the scene from custom code → call `viewer.scene.requestRender()`.**
+  `requestRenderMode` won't redraw on its own. The `animate` helper does this
+  for you each tick.
+- **A property that has stopped changing → make it a `ConstantProperty`.**
+  Otherwise Cesium can't cache the geometry and you pay the per-frame cost
+  forever.
+
+The same pattern applies to any RAF-driven thing you write — orbits, fades,
+hand-rolled fly-tos.
+
 ## Common gotchas (for debugging user issues)
 
 When users report problems, check these first:
